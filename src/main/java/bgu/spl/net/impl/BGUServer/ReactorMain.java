@@ -1,11 +1,117 @@
 package bgu.spl.net.impl.BGUServer;
 
 import bgu.spl.net.api.ClientMessage;
+import bgu.spl.net.api.Message;
 import bgu.spl.net.api.MessageEncoderDecoderImpl;
+import bgu.spl.net.api.ServerResponse;
 
 import java.nio.charset.StandardCharsets;
 
 public class ReactorMain {
+
+    public static byte[] encode(Message message) {
+        ServerResponse response = (ServerResponse) message;
+        short firstOP = response.getFirstOP();
+
+        //Error
+        if(firstOP==11) {
+            byte[] firstOPByte = shortToBytes(firstOP);
+            byte[] secondOPByte = shortToBytes(response.getSecondOP());
+            byte[] errorResponse = mergeBytes(firstOPByte,secondOPByte);
+            return errorResponse;
+        }
+
+        //Notification
+        else if (firstOP==9) {
+            //First op byte array
+            byte[] firstOPByte = shortToBytes(firstOP);
+
+            //Notification type byte array
+            char notificationType = response.getNotificationType();
+            byte[] notificationTypeByte = {(byte) notificationType};
+
+            //Posting user byte array
+            String postingUser = response.getPostingUser();
+            char[] charArr = postingUser.toCharArray();
+            byte [] postingUserByte = charArrToBytes(charArr);
+
+            //Zero byte array
+            byte[] zero = {'\0'};
+
+            //Content byte array
+            String content = response.getContent();
+            char[] charArr1 = content.toCharArray();
+            byte [] contentByte = charArrToBytes(charArr1);
+
+            //Merge all byte arrays
+            byte[] b1 = mergeBytes(firstOPByte,notificationTypeByte);
+            byte[] b2 = mergeBytes(b1,postingUserByte);
+            byte[] b3 = mergeBytes(b2,zero);
+            byte[] b4 = mergeBytes(b3,contentByte);
+            byte[] responseByte = mergeBytes(b4,zero);
+
+            return responseByte;
+        }
+
+        //Ack
+        else {
+            byte[] firstOPByte = shortToBytes(firstOP);
+
+            short secondOP = response.getSecondOP();
+            byte[] secondOPByte = shortToBytes(secondOP);
+
+            //Follow
+            if(secondOP==4) {
+                String username = response.getUsername();
+                char[] charArr1 = username.toCharArray();
+                byte [] usernameByte = charArrToBytes(charArr1);
+                byte[] zero = {'\0'};
+
+                byte[] b1 = mergeBytes(firstOPByte,secondOPByte);
+                byte[] b2 = mergeBytes(b1, usernameByte);
+                byte[] responseByte = mergeBytes(b2,zero);
+
+                return responseByte;
+            }
+
+            //Logstat, Stat
+            else if (secondOP==7 || secondOP==8) {
+                short age = response.getAge();
+                byte[] ageByte = shortToBytes(age);
+
+                short numPosts = response.getNumPosts();
+                byte[] numPostsByte = shortToBytes(numPosts);
+
+                short numFollowers = response.getNumFollowers();
+                byte[] numFollowersByte = shortToBytes(numFollowers);
+
+                short numFollowing = response.getNumFollowing();
+                byte[] numFollowingByte = shortToBytes(numFollowing);
+
+                byte[] b1 = mergeBytes(firstOPByte,secondOPByte);
+                byte[] b2 = mergeBytes(b1,ageByte);
+                byte[] b3 = mergeBytes(b2,numPostsByte);
+                byte[] b4 = mergeBytes(b3,numFollowersByte);
+                byte[] responseByte = mergeBytes(b4,numFollowingByte);
+
+                return responseByte;
+            }
+
+            //Generic Ack
+            else {
+                byte[] responseByte = mergeBytes(firstOPByte,secondOPByte);
+                return responseByte;
+            }
+        }
+    }
+
+    public static byte[] charArrToBytes(char[] charArr) {
+        byte[] bytesArr = new byte[charArr.length];
+        for(int i=0;i<charArr.length;i++){
+            bytesArr[i]= (byte) charArr[i];
+        }
+        return bytesArr;
+    }
 
     public static short bytesToShort(byte[] byteArr){
         short result = (short)((byteArr[0] & 0xff) << 8);
@@ -32,6 +138,30 @@ public class ReactorMain {
 
     public static void main (String [] args) {
 
+        ServerResponse sr = new ServerResponse((short)10);
+        sr.setSecondOP((short)7);
+        sr.setAge((short)4);
+        sr.setNumPosts((short)5);
+        sr.setNumFollowers((short)6);
+        sr.setNumFollowing((short)7);
+
+
+        byte[] response = encode(sr);
+        for(int i=0; i<response.length; i++) {
+            System.out.print(response[i]+", ");
+        }
+
+//        String vIn = "A";
+//        char [] vOut = vIn.toCharArray();
+//        byte[] b = {(byte)vOut[0]};
+//
+//        char a = '1';
+//        byte by = (byte) a;
+//        byte[] byteArr = {(byte)a};
+//        byteArr[0] = by;
+//        System.out.println(by);
+
+//        System.out.println(b[0]);
 
         //TESTING USER MESSAGES - DecodeNextByte
 //        short op = 6;

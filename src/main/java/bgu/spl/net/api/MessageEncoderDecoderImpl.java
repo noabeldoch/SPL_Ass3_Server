@@ -20,12 +20,110 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
 
     @Override
     public byte[] encode(Message message) {
-        // we will get message like "8 2" or "8 0dani\0blabla\0" or "8 2 18 2 8 3" (=STAT)
-        // the numbers should be short.
-        //in the protocol we will add a space after the opcode and after each short,
-        // and here we will use ShortToBytes when necessary
-        return (message + "\n").getBytes();
+        ServerResponse response = (ServerResponse) message;
+        short firstOP = response.getFirstOP();
+
+        //Error
+        if(firstOP==11) {
+            byte[] firstOPByte = shortToBytes(firstOP);
+            byte[] secondOPByte = shortToBytes(response.getSecondOP());
+            byte[] errorResponse = mergeBytes(firstOPByte,secondOPByte);
+            return errorResponse;
+        }
+
+        //Notification
+        else if (firstOP==9) {
+            //First op byte array
+            byte[] firstOPByte = shortToBytes(firstOP);
+
+            //Notification type byte array
+            char notificationType = response.getNotificationType();
+            byte[] notificationTypeByte = {(byte) notificationType};
+
+            //Posting user byte array
+            String postingUser = response.getPostingUser();
+            char[] charArr = postingUser.toCharArray();
+            byte [] postingUserByte = charArrToBytes(charArr);
+
+            //Zero byte array
+            byte[] zero = {'\0'};
+
+            //Content byte array
+            String content = response.getContent();
+            char[] charArr1 = content.toCharArray();
+            byte [] contentByte = charArrToBytes(charArr1);
+
+            //Merge all byte arrays
+            byte[] b1 = mergeBytes(firstOPByte,notificationTypeByte);
+            byte[] b2 = mergeBytes(b1,postingUserByte);
+            byte[] b3 = mergeBytes(b2,zero);
+            byte[] b4 = mergeBytes(b3,contentByte);
+            byte[] responseByte = mergeBytes(b4,zero);
+
+            return responseByte;
+        }
+
+        //Ack
+        else {
+            byte[] firstOPByte = shortToBytes(firstOP);
+
+            short secondOP = response.getSecondOP();
+            byte[] secondOPByte = shortToBytes(secondOP);
+
+            //Follow
+            if(secondOP==4) {
+                String username = response.getUsername();
+                char[] charArr1 = username.toCharArray();
+                byte [] usernameByte = charArrToBytes(charArr1);
+                byte[] zero = {'\0'};
+
+                byte[] b1 = mergeBytes(firstOPByte,secondOPByte);
+                byte[] b2 = mergeBytes(b1, usernameByte);
+                byte[] responseByte = mergeBytes(b2,zero);
+
+                return responseByte;
+            }
+
+            //Logstat, Stat
+            else if (secondOP==7 || secondOP==8) {
+                short age = response.getAge();
+                byte[] ageByte = shortToBytes(age);
+
+                short numPosts = response.getNumPosts();
+                byte[] numPostsByte = shortToBytes(numPosts);
+
+                short numFollowers = response.getNumFollowers();
+                byte[] numFollowersByte = shortToBytes(numFollowers);
+
+                short numFollowing = response.getNumFollowing();
+                byte[] numFollowingByte = shortToBytes(numFollowing);
+
+                byte[] b1 = mergeBytes(firstOPByte,secondOPByte);
+                byte[] b2 = mergeBytes(b1,ageByte);
+                byte[] b3 = mergeBytes(b2,numPostsByte);
+                byte[] b4 = mergeBytes(b3,numFollowersByte);
+                byte[] responseByte = mergeBytes(b4,numFollowingByte);
+
+                return responseByte;
+            }
+
+            //Generic Ack
+            else {
+                byte[] responseByte = mergeBytes(firstOPByte,secondOPByte);
+                return responseByte;
+            }
+        }
     }
+
+
+    private byte[] charArrToBytes(char[] charArr) {
+        byte[] bytesArr = new byte[charArr.length];
+        for(int i=0;i<charArr.length;i++){
+            bytesArr[i]= (byte) charArr[i];
+        }
+        return bytesArr;
+    }
+
 
     public short bytesToShort(byte[] byteArr){
         short result = (short)((byteArr[0] & 0xff) << 8);
@@ -116,5 +214,22 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
             return clientMessage;
         }
         return null;
+    }
+
+    public static byte[] shortToBytes(short num){
+        byte[] bytesArr = new byte[2];
+        bytesArr[0] = (byte)((num >> 8) & 0xFF);
+        bytesArr[1] = (byte)(num & 0xFF);
+        return bytesArr;
+    }
+
+    public static byte[] mergeBytes(byte[] a, byte[] b) {
+        //return merged array, a is first b is second
+        int aLen = a.length;
+        int bLen = b.length;
+        byte[] c = new byte[aLen + bLen];
+        System.arraycopy(a, 0, c, 0, aLen);
+        System.arraycopy(b, 0, c, aLen, bLen);
+        return c;
     }
 }
