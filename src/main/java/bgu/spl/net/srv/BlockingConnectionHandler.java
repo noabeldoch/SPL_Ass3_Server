@@ -37,11 +37,11 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
                 if (nextMessage != null) {
 
                     //Process in Bidi is void, adjust to our implementation
-                    //T response = protocol.process(nextMessage);
-//                    if (response != null) {
-//                        out.write(encdec.encode(response));
-//                        out.flush();
-//                    }
+                    T response = protocol.process(nextMessage);
+                    if (response != null) {
+                        out.write(encdec.encode(response));
+                        out.flush();
+                    }
                 }
             }
 

@@ -52,11 +52,11 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
                         if (nextMessage != null) {
 
                             //Process in Bidi is void, adjust to our implementation
-//                            T response = protocol.process(nextMessage);
-//                            if (response != null) {
-//                                writeQueue.add(ByteBuffer.wrap(encdec.encode(response)));
-//                                reactor.updateInterestedOps(chan, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-//                            }
+                            T response = protocol.process(nextMessage);
+                            if (response != null) {
+                                writeQueue.add(ByteBuffer.wrap(encdec.encode(response)));
+                                reactor.updateInterestedOps(chan, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+                            }
                         }
                     }
                 } finally {

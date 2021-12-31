@@ -15,10 +15,10 @@ public class EchoProtocol implements BidiMessagingProtocol<String> {
     }
 
     @Override
-    public void process(String msg) {
+    public String process(String msg) {
         shouldTerminate = "bye".equals(msg);
         System.out.println("[" + LocalDateTime.now() + "]: " + msg);
-        //return createEcho(msg);
+        return createEcho(msg);
     }
 
     private String createEcho(String message) {

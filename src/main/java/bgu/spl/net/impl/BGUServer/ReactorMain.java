@@ -6,6 +6,9 @@ import bgu.spl.net.api.MessageEncoderDecoderImpl;
 import bgu.spl.net.api.ServerResponse;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.format.DateTimeFormatter;
 
 public class ReactorMain {
 
@@ -138,18 +141,19 @@ public class ReactorMain {
 
     public static void main (String [] args) {
 
-        ServerResponse sr = new ServerResponse((short)10);
-        sr.setSecondOP((short)7);
-        sr.setAge((short)4);
-        sr.setNumPosts((short)5);
-        sr.setNumFollowers((short)6);
-        sr.setNumFollowing((short)7);
 
-
-        byte[] response = encode(sr);
-        for(int i=0; i<response.length; i++) {
-            System.out.print(response[i]+", ");
-        }
+//        ServerResponse sr = new ServerResponse((short)10);
+//        sr.setSecondOP((short)7);
+//        sr.setAge((short)4);
+//        sr.setNumPosts((short)5);
+//        sr.setNumFollowers((short)6);
+//        sr.setNumFollowing((short)7);
+//
+//
+//        byte[] response = encode(sr);
+//        for(int i=0; i<response.length; i++) {
+//            System.out.print(response[i]+", ");
+//        }
 
 //        String vIn = "A";
 //        char [] vOut = vIn.toCharArray();
