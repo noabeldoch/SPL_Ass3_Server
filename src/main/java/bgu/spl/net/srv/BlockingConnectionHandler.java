@@ -1,7 +1,9 @@
 package bgu.spl.net.srv;
 
+import bgu.spl.net.api.Database;
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.bidi.BidiMessagingProtocol;
+import bgu.spl.net.api.bidi.ConnectionsImpl;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -17,11 +19,20 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     private BufferedInputStream in;
     private BufferedOutputStream out;
     private volatile boolean connected = true;
+    private Database db;
+    private int connId;
+    private ConnectionsImpl connections;
 
     public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol) {
         this.sock = sock;
         this.encdec = reader;
         this.protocol = protocol;
+        this.db = Database.getInstance();
+        this.connections = ConnectionsImpl.getInstance();
+        this.connId = db.getConnId();
+
+        protocol.start(connId,connections);
+        connections.addToIdToHandler(connId,this);
     }
 
     @Override
@@ -57,9 +68,16 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
         sock.close();
     }
 
-    //IMPLEMENT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
     @Override
     public void send(T msg) {
-
+        try{
+            if (msg != null) {
+                out.write(encdec.encode(msg));
+                out.flush();
+            }
+        }
+        catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 }

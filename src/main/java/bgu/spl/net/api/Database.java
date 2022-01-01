@@ -24,9 +24,14 @@ public class Database {
 
     private Database() {
         users = new ConcurrentHashMap<>();
-        connectionIdCounter.set(0);
+        connectionIdCounter = new AtomicInteger(0);
         posts = new LinkedList<>();
         filterWords = new Vector<>(Arrays.asList("war","Trump"));
+
+    }
+
+    public int getConnId() {
+        return connectionIdCounter.addAndGet(1);
     }
 
     public Client getUser(String username) {
@@ -269,5 +274,99 @@ public class Database {
         }
         output.append(words[words.length-1]);
         return output.toString();
+    }
+
+    public ServerResponse logstat(ClientMessage message, Client client) {
+        String ourUsername = client.getUsername();
+        //Check if is not registered || is not logged in
+        if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
+           return createError(message.getOp());
+        }
+
+        for(Map.Entry<String, Client> user : users.entrySet()) {
+           String currUsername = user.getKey();
+           if(!client.getUserBlockedMe().contains(currUsername) && !currUsername.equals(ourUsername)) {
+               Client currUser = user.getValue();
+               ServerResponse logstat = new ServerResponse((short)10);
+               logstat.setSecondOP((short)7);
+               logstat.setAge(currUser.getAge());
+               logstat.setNumPosts(currUser.getNumPosts());
+               logstat.setNumFollowing((short)currUser.getFollowing().size());
+               logstat.setNumFollowers((short)currUser.getFollowers().size());
+
+               connections.send(ourUsername, logstat);
+           }
+        }
+        return null;
+    }
+
+    public ServerResponse stat(ClientMessage message, Client client) {
+        String ourUsername = client.getUsername();
+        //Check if is not registered || is not logged in
+        if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
+            return createError(message.getOp());
+        }
+
+        String[] arr = message.getContent().split("|");
+        Vector<String> usernames = new Vector<>(Arrays.asList(arr));
+        for(String name : usernames) {
+
+            //User doesnt exist - return Error
+            if(!isUserExist(name)) {
+                return createError(message.getOp());
+            }
+
+            //User blocked me - delete the user from the vector
+            else if (client.getUserBlockedMe().contains(name)) {
+                usernames.remove(name);
+            }
+        }
+
+        //If the vector is empty - return Error
+        if (usernames.isEmpty()) {
+            return createError(message.getOp());
+        }
+
+        for(String name : usernames) {
+            Client currUser = users.get(name);
+            ServerResponse stat = new ServerResponse((short)10);
+            stat.setSecondOP((short)8);
+            stat.setAge(currUser.getAge());
+            stat.setNumPosts(currUser.getNumPosts());
+            stat.setNumFollowing((short)currUser.getFollowing().size());
+            stat.setNumFollowers((short)currUser.getFollowers().size());
+
+            connections.send(ourUsername, stat);
+        }
+        return null;
+    }
+
+    public ServerResponse block(ClientMessage message, Client client) {
+        String ourUsername = client.getUsername();
+        //Check if is not registered || is not logged in || user to block is not exist
+        if(!isUserExist(ourUsername) ||
+          !isLoggedIn(ourUsername) ||
+          !isUserExist(message.getUsername())) {
+            return createError(message.getOp());
+        }
+
+        String userToBlock = message.getUsername();
+        if(client.getFollowers().contains(userToBlock))
+            client.removeUserFromFollowers(userToBlock);
+        if(client.getFollowing().contains(userToBlock))
+            client.removeUserFromFollowing(userToBlock);
+
+        Client blockedUser = users.get(userToBlock);
+        if(blockedUser.getFollowers().contains(ourUsername))
+            blockedUser.removeUserFromFollowers(ourUsername);
+        if(blockedUser.getFollowing().contains(ourUsername))
+            blockedUser.removeUserFromFollowing(ourUsername);
+
+        client.addToUserIBLocked(userToBlock);
+        blockedUser.addToUserBLockedME(ourUsername);
+
+        ServerResponse response = new ServerResponse((short)10);
+        response.setSecondOP((short)12);
+        return response;
     }
 }

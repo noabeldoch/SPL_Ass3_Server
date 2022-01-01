@@ -152,4 +152,12 @@ public class Client {
     public void addUnreadMessageToQueue(Message message) {
         unreadMessages.add(message);
     }
+
+    public void addToUserIBLocked(String username) {
+        usersIBlocked.add(username);
+    }
+
+    public void addToUserBLockedME(String username) {
+        userBlockedMe.add(username);
+    }
 }

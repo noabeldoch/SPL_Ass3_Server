@@ -3,7 +3,7 @@ package bgu.spl.net.api;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>{
+public class MessageEncoderDecoderImpl<T> implements MessageEncoderDecoder<Message>{
 
 
     private byte[] bytes = new byte[1 << 10]; //start with 1k
@@ -149,12 +149,12 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
         ClientMessage clientMessage = new ClientMessage(op);
 
         //Logout, Logstat
-        if(op==3 || op==7) {
-            return clientMessage;
-        }
+//        NOT NEEDED - DO NOTHING
+//        if(op==3 || op==7) {
+//        }
 
         //Post, Stat, Block
-        else if(op==5 || op==8 || op==12) {
+        if(op==5 || op==8 || op==12) {
             String str = new String(bytes, 2, len - 3, StandardCharsets.UTF_8);  //without the \0 byte in the end
             if(op==5)
                 clientMessage.setContent(str);
@@ -162,7 +162,6 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
                 clientMessage.setUsersNamesList(str);
             else
                 clientMessage.setUsername(str);
-            return clientMessage;
         }
 
         //Follow
@@ -178,7 +177,6 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
             String name = new String(bytes,3,len-4, StandardCharsets.UTF_8);
             clientMessage.setUsername(name);
 
-            return clientMessage;
         }
 
         //Login
@@ -194,7 +192,6 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
             char captcha = capArr[0];
             clientMessage.setCaptcha(captcha);
 
-            return clientMessage;
         }
 
         //Register, PM
@@ -211,9 +208,10 @@ public class MessageEncoderDecoderImpl implements MessageEncoderDecoder<Message>
                 clientMessage.setContent(strArr[1]);
                 clientMessage.setSendDate(strArr[2]);
             }
-            return clientMessage;
         }
-        return null;
+        bytes = new byte[1 << 10];
+        len = 0;
+        return clientMessage;
     }
 
     public static byte[] shortToBytes(short num){

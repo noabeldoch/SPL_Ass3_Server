@@ -4,21 +4,24 @@ import bgu.spl.net.api.*;
 
 import javax.xml.crypto.Data;
 
-public class MessagingProtocolImpl implements BidiMessagingProtocol<Message>{
+public class MessagingProtocolImpl<T> implements BidiMessagingProtocol<Message>{
 
-    private boolean shouldTerminate = false;
+    private boolean shouldTerminate;
     private int connId;
-    private Connections connections;
-    private Database db = Database.getInstance();
-    private Client client = null;
+    private ConnectionsImpl connections;
+    private Database db;
+    private Client client;
 
     /**
      * Used to initiate the current client protocol with it's personal connection ID and the connections implementation
      **/
     @Override
     public void start(int connectionId, Connections connections) {
+        this.db = Database.getInstance();
         this.connId = connectionId;
-        this.connections = connections;
+        this.connections = (ConnectionsImpl) connections;
+        this.client=null;
+        this.shouldTerminate=false;
     }
 
     @Override
@@ -29,7 +32,7 @@ public class MessagingProtocolImpl implements BidiMessagingProtocol<Message>{
             case 1:
                 return register(clientMessage);
             case 2:
-                return db.login(clientMessage);
+                return login(clientMessage);
             case 3:
                 return logout(clientMessage);
             case 4:
@@ -38,6 +41,15 @@ public class MessagingProtocolImpl implements BidiMessagingProtocol<Message>{
                 return db.post(clientMessage, client);
             case 6:
                 return db.PM(clientMessage, client);
+            case 7:
+                //logstat - check if the response is null, otherwise it's an error
+                return db.logstat(clientMessage, client);
+            case 8:
+                //stat - check if the response is null, otherwise it's an error
+                return db.stat(clientMessage, client);
+            case 12:
+                return db.block(clientMessage, client);
+
         }
         return null;
     }
@@ -49,7 +61,26 @@ public class MessagingProtocolImpl implements BidiMessagingProtocol<Message>{
 
     public ServerResponse register (ClientMessage message) {
         ServerResponse response = db.register(message, connId);
-        client = db.getUser(message.getUsername());
+
+        //Only after successful register, save the current client, and save the client in the hashmap in connections
+        if (response.getFirstOP()==(short)10) {
+            client = db.getUser(message.getUsername());
+            connections.addIdAndUsername(connId,client.getUsername());
+        }
+        return response;
+    }
+
+    public ServerResponse login(ClientMessage message) {
+        ServerResponse response = db.login(message);
+
+        //If a client registered in the past, and now tries login without register, we need to save the client in the protocol
+        if(client==null && response.getFirstOP()==(short)10)
+            client = db.getUser(message.getUsername());
+
+        //For successful login, need to save in the hashmap in connections
+        if (response.getFirstOP()==(short)10)
+            connections.addIdAndUsername(connId,client.getUsername());
+
         return response;
     }
 
@@ -57,7 +88,7 @@ public class MessagingProtocolImpl implements BidiMessagingProtocol<Message>{
         ServerResponse response= db.logout(message, client.getUsername());
         if(response.getFirstOP()==10) {
             this.shouldTerminate=true;
-            //TODO remove the connection Id from Connections map
+            connections.disconnect(connId);
         }
         return response;
     }
