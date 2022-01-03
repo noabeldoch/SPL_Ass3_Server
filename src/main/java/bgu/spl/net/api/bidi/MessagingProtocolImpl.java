@@ -80,13 +80,31 @@ public class MessagingProtocolImpl<T> implements BidiMessagingProtocol<Message>{
         //For successful login, need to save in the hashmap in connections
         if (response.getFirstOP()==(short)10)
             connections.addIdAndUsername(connId,client.getUsername());
+        if(client.getUnreadMessages().isEmpty()) {
+            return response;
+        }
+        else{
+            sendUnreadMessages(response);
+            return null;
+        }
+    }
 
-        return response;
+    public void sendUnreadMessages(ServerResponse serverResponse) {
+//        if (!client.getUnreadMessages().isEmpty()) {
+            connections.send(client.getUsername(), serverResponse);
+            while(!client.getUnreadMessages().isEmpty()){
+                ServerResponse response = (ServerResponse)client.getUnreadMessages().poll();
+                connections.send(client.getUsername(),response);
+//            }
+        }
     }
 
     public ServerResponse logout (ClientMessage message) {
+        if(client==null) {
+            return db.createError(message.getOp());
+        }
         ServerResponse response= db.logout(message, client.getUsername());
-        if(response.getFirstOP()==10) {
+        if(response.getFirstOP()==(short)10) {
             this.shouldTerminate=true;
             connections.disconnect(connId);
         }

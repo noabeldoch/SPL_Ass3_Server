@@ -194,25 +194,31 @@ public class MessageEncoderDecoderImpl<T> implements MessageEncoderDecoder<Messa
 
         }
 
-        //Register, PM
-        else if (op==1 || op==6) {
+        //Register
+        else if (op==1) {
             String str = new String(bytes,2,len-3, StandardCharsets.UTF_8);
             String [] strArr = str.split("\0");
-            if (op==1) {
-                clientMessage.setUsername(strArr[0]);
-                clientMessage.setPassword(strArr[1]);
-                clientMessage.setBirthday(strArr[2]);
-            }
-            else {
-                clientMessage.setUsername(strArr[0]);
-                clientMessage.setContent(strArr[1]);
-                clientMessage.setSendDate(strArr[2]);
-            }
+            clientMessage.setUsername(strArr[0]);
+            clientMessage.setPassword(strArr[1]);
+            clientMessage.setBirthday(strArr[2]);
+        }
+
+        //PM
+        else if (op==6) {
+            String str = new String(bytes,2,len-3, StandardCharsets.UTF_8);
+            int indexOfFirstSpace = str.indexOf('\0');
+            String username = str.substring(0,indexOfFirstSpace);
+            String content = str.substring(indexOfFirstSpace+1,str.length());
+            clientMessage.setUsername(username);
+            clientMessage.setContent(content);
         }
         bytes = new byte[1 << 10];
         len = 0;
         return clientMessage;
     }
+
+
+
 
     public static byte[] shortToBytes(short num){
         byte[] bytesArr = new byte[2];

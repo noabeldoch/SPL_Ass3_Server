@@ -12,20 +12,25 @@ public class ConnectionsImpl implements Connections{
     private ConcurrentHashMap<String, Integer> usernameToId;
     private ConcurrentHashMap<Integer,String> idToUsername;
     private ConcurrentHashMap<Integer, ConnectionHandler> idToHandler;
-    private Database db = Database.getInstance();
+    private Database db;
 
     private static class ConnectionsHolder{
         private static ConnectionsImpl instance = new ConnectionsImpl();
     }
 
-    public static ConnectionsImpl getInstance() {
-        return ConnectionsImpl.ConnectionsHolder.instance;
+    private ConnectionsImpl() {
+        this.usernameToId = new ConcurrentHashMap<>();
+        this.idToUsername = new ConcurrentHashMap<>();
+        this.idToHandler = new ConcurrentHashMap<>();
+        this.db = null;
     }
 
-    private ConnectionsImpl() {
-        usernameToId = new ConcurrentHashMap<>();
-        idToUsername = new ConcurrentHashMap<>();
-        idToHandler = new ConcurrentHashMap<>();
+    public static ConnectionsImpl getInstance() {
+        return ConnectionsHolder.instance;
+    }
+
+    public void setDataBase() {
+        this.db = Database.getInstance();
     }
 
     //Use the function send() of connectionHandler in order to send message to the client -
@@ -38,9 +43,9 @@ public class ConnectionsImpl implements Connections{
     }
 
     public boolean send(String username, Message msg) {
-        int connId = usernameToId.get(username);
         if(!db.getUser(username).isLoggedIn())
             return false;
+        int connId = usernameToId.get(username);
         return send(connId, msg);
     }
 

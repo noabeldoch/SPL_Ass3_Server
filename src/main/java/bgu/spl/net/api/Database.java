@@ -12,22 +12,26 @@ public class Database {
     AtomicInteger connectionIdCounter; //Maybe will be in server and reactor instead
     LinkedList<String> posts; //All the posts and PM that were sent (saved in ClientMessage content)
     Vector<String> filterWords;
-    ConnectionsImpl connections = ConnectionsImpl.getInstance();
+    ConnectionsImpl connections;
 
-    private  static class DBHolder{
+    private static class DBHolder{
         private static Database instance = new Database();
+    }
+
+    private Database() {
+        this.users = new ConcurrentHashMap<>();
+        this.connectionIdCounter = new AtomicInteger(0);
+        this.posts = new LinkedList<>();
+        this.filterWords = new Vector<>(Arrays.asList("war","Trump"));
+        this.connections = null;
     }
 
     public static Database getInstance() {
         return DBHolder.instance;
     }
 
-    private Database() {
-        users = new ConcurrentHashMap<>();
-        connectionIdCounter = new AtomicInteger(0);
-        posts = new LinkedList<>();
-        filterWords = new Vector<>(Arrays.asList("war","Trump"));
-
+    public void setConnections () {
+        connections = ConnectionsImpl.getInstance();
     }
 
     public int getConnId() {
@@ -79,16 +83,19 @@ public class Database {
         //Check if user is not registered || already logged in || wrong password || invalid captcha
         if(!isUserExist(message.getUsername()) ||
            isLoggedIn(message.getUsername()) ||
-           message.getPassword()!=users.get(message.getUsername()).getPassword() ||
-           message.getCaptcha()!=1) {
+           !message.getPassword().equals(users.get(message.getUsername()).getPassword()) ||
+           message.getCaptcha()!='1') {
             return createError(message.getOp());
         }
         Client client = users.get(message.getUsername());
         client.setLoggedIn(true);
 
-        if (!client.getUnreadMessages().isEmpty()) {
-            //TODO Implement - check if the client has unread messages and send them as notifications ??????????
-        }
+//        if (!client.getUnreadMessages().isEmpty()) {
+//            while(!client.getUnreadMessages().isEmpty()){
+//                ServerResponse response = (ServerResponse)client.getUnreadMessages().poll();
+//                connections.send(client.getUsername(),response);
+//            }
+//        }
 
         //Create Ack
         ServerResponse response = new ServerResponse((short)10);
@@ -112,6 +119,9 @@ public class Database {
     }
 
     public ServerResponse follow(ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in
         if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
@@ -119,7 +129,7 @@ public class Database {
         }
 
         //Follow==0
-        if (message.getFollow()==0) {
+        if (message.getFollow()=='0') {
 
             String usernameToFollow = message.getUsername();
 
@@ -165,6 +175,9 @@ public class Database {
     }
 
     public ServerResponse post(ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in
         if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
@@ -224,6 +237,9 @@ public class Database {
     }
 
     public ServerResponse PM (ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in
         if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
@@ -258,25 +274,28 @@ public class Database {
 
     public String filterMessage(String message) {
 
-        String [] words = message.split(" ");
+        Vector<String> words = splitString(message, ' ');
 
         for(int i=0; i<filterWords.size(); i++) {
             String word = filterWords.get(i);
-            for(int j=0; j<words.length; j++) {
-                if(words[j].equals(word)) {
-                    words[j] = "<filtered>";
+            for(int j=0; j<words.size(); j++) {
+                if(words.get(j).equals(word)) {
+                    words.set(j,"<filtered>");
                 }
             }
         }
         StringBuilder output = new StringBuilder();
-        for (int i=0; i<words.length-1; i++) {
-            output.append(words[i]+" ");
+        for (int i=0; i<words.size()-1; i++) {
+            output.append(words.get(i)+" ");
         }
-        output.append(words[words.length-1]);
+        output.append(words.get(words.size()-1));
         return output.toString();
     }
 
     public ServerResponse logstat(ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in
         if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
@@ -285,7 +304,8 @@ public class Database {
 
         for(Map.Entry<String, Client> user : users.entrySet()) {
            String currUsername = user.getKey();
-           if(!client.getUserBlockedMe().contains(currUsername) && !currUsername.equals(ourUsername)) {
+           if(!client.getUserBlockedMe().contains(currUsername) &&
+              !client.getUsersIBlocked().contains(currUsername)) {
                Client currUser = user.getValue();
                ServerResponse logstat = new ServerResponse((short)10);
                logstat.setSecondOP((short)7);
@@ -300,15 +320,35 @@ public class Database {
         return null;
     }
 
+    private Vector<String> splitString(String str, char delimiter) {
+        Vector<String> vec = new Vector<>();
+        StringBuilder temp = new StringBuilder();
+        for (int i=0; i<str.length(); i++) {
+            if(str.charAt(i)!=delimiter){
+                temp.append(str.charAt(i));
+            }
+            else {
+                vec.add(temp.toString());
+                temp = new StringBuilder();
+            }
+        }
+        if (temp.length()!=0)
+            vec.add(temp.toString());
+        return vec;
+    }
+
     public ServerResponse stat(ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in
         if(!isUserExist(ourUsername) || !isLoggedIn(ourUsername)) {
             return createError(message.getOp());
         }
 
-        String[] arr = message.getContent().split("|");
-        Vector<String> usernames = new Vector<>(Arrays.asList(arr));
+        Vector<String> usernames = splitString(message.getUsersNamesList(), '|');
+        Vector<String> validUsernames = new Vector<>();
         for(String name : usernames) {
 
             //User doesnt exist - return Error
@@ -317,17 +357,17 @@ public class Database {
             }
 
             //User blocked me - delete the user from the vector
-            else if (client.getUserBlockedMe().contains(name)) {
-                usernames.remove(name);
+            else if (!client.getUserBlockedMe().contains(name) && !client.getUsersIBlocked().contains(name)) {
+                validUsernames.add(name);
             }
         }
 
         //If the vector is empty - return Error
-        if (usernames.isEmpty()) {
+        if (validUsernames.isEmpty()) {
             return createError(message.getOp());
         }
 
-        for(String name : usernames) {
+        for(String name : validUsernames) {
             Client currUser = users.get(name);
             ServerResponse stat = new ServerResponse((short)10);
             stat.setSecondOP((short)8);
@@ -342,6 +382,9 @@ public class Database {
     }
 
     public ServerResponse block(ClientMessage message, Client client) {
+        if(client==null) {
+            return createError(message.getOp());
+        }
         String ourUsername = client.getUsername();
         //Check if is not registered || is not logged in || user to block is not exist
         if(!isUserExist(ourUsername) ||
